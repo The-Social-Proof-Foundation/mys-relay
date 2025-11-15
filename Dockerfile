@@ -1,5 +1,14 @@
 FROM rust:1.84 as build
 
+# Install build dependencies required for rdkafka-sys
+RUN apt-get update && \
+    apt-get install -y \
+    cmake \
+    pkg-config \
+    libssl-dev \
+    zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Copy workspace files
