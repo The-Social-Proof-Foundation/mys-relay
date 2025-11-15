@@ -18,12 +18,10 @@ fn build_client_config(config: &RedpandaConfig) -> ClientConfig {
         .set("bootstrap.servers", &config.brokers)
         .set("metadata.request.timeout.ms", "30000")
         .set("socket.timeout.ms", "30000")
-        .set("socket.keepalive.enable", "true")
-        // Force IPv4 to avoid IPv6 connection issues
-        // Railway internal networking may resolve to IPv6 but service only listens on IPv4
-        .set("broker.address.family", "v4");
+        .set("socket.keepalive.enable", "true");
     
-    tracing::info!("Configured to prefer IPv4 connections (broker.address.family=v4)");
+    // Railway uses IPv6 for internal networking, so we let rdkafka use the default
+    // address family resolution (which supports both IPv4 and IPv6)
     
     // Add SSL/TLS configuration if REDPANDA_SSL_ENABLED is set
     if let Ok(ssl_enabled) = std::env::var("REDPANDA_SSL_ENABLED") {
