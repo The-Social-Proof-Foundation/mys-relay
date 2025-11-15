@@ -49,8 +49,10 @@ WORKDIR /app
 
 # Install runtime dependencies
 RUN apt-get update && \
-    apt-get install -y ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get install -y \
+    ca-certificates \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy the binary
 COPY --from=build /app/target/release/relay-runner /usr/local/bin/relay
