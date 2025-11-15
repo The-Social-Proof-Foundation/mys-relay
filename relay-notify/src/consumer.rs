@@ -66,6 +66,13 @@ pub async fn run(ctx: RelayContext) -> Result<()> {
                         error_count,
                         e
                     );
+                    if error_count == 1 {
+                        tracing::warn!("Troubleshooting Redpanda connection:");
+                        tracing::warn!("  1. Verify REDPANDA_BROKERS is correct and brokers are accessible");
+                        tracing::warn!("  2. Check if SSL/TLS is required (set REDPANDA_SSL_ENABLED=true)");
+                        tracing::warn!("  3. For Railway: use internal networking (.railway.internal) instead of public URL");
+                        tracing::warn!("  4. Ensure Redpanda service is running and listening on the configured port");
+                    }
                     last_error_log = std::time::Instant::now();
                 }
                 // Exponential backoff: 1s, 2s, 4s, max 30s

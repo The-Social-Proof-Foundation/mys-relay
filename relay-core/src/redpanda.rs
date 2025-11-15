@@ -11,21 +11,59 @@ use crate::config::RedpandaConfig;
 pub type RedpandaProducer = Arc<FutureProducer>;
 pub type RedpandaConsumer = Arc<StreamConsumer>;
 
+fn build_client_config(config: &RedpandaConfig) -> ClientConfig {
+    let mut client_config = ClientConfig::new();
+    
+    client_config
+        .set("bootstrap.servers", &config.brokers)
+        .set("metadata.request.timeout.ms", "30000")
+        .set("socket.timeout.ms", "30000")
+        .set("socket.keepalive.enable", "true");
+    
+    // Add SSL/TLS configuration if REDPANDA_SSL_ENABLED is set
+    if let Ok(ssl_enabled) = std::env::var("REDPANDA_SSL_ENABLED") {
+        if ssl_enabled == "true" || ssl_enabled == "1" {
+            tracing::info!("SSL/TLS enabled for Redpanda connection");
+            client_config
+                .set("security.protocol", "ssl");
+            
+            // Optional: SSL certificate and key paths
+            if let Ok(ca_location) = std::env::var("REDPANDA_SSL_CA_LOCATION") {
+                client_config.set("ssl.ca.location", &ca_location);
+            }
+            if let Ok(cert_location) = std::env::var("REDPANDA_SSL_CERT_LOCATION") {
+                client_config.set("ssl.certificate.location", &cert_location);
+            }
+            if let Ok(key_location) = std::env::var("REDPANDA_SSL_KEY_LOCATION") {
+                client_config.set("ssl.key.location", &key_location);
+            }
+        }
+    }
+    
+    client_config
+}
+
 pub fn create_producer(config: &RedpandaConfig) -> Result<RedpandaProducer> {
     tracing::info!("Creating Redpanda producer");
     tracing::info!("Brokers: {}", config.brokers);
+    
+    if config.brokers.contains(".railway.app") {
+        tracing::warn!("Using Railway public URL for brokers. Consider using internal Railway networking (.railway.internal) for better connectivity.");
+    }
 
-    let producer: FutureProducer = ClientConfig::new()
-        .set("bootstrap.servers", &config.brokers)
+    let producer: FutureProducer = build_client_config(config)
         .set("message.timeout.ms", "5000")
         .set("acks", "all")
         .set("retries", "3")
-        .set("metadata.request.timeout.ms", "10000")
-        .set("socket.timeout.ms", "10000")
         .create()
         .map_err(|e| {
             tracing::error!("Failed to create Redpanda producer: {}", e);
-            tracing::error!("Please verify REDPANDA_BROKERS is set correctly and brokers are accessible");
+            tracing::error!("Broker address: {}", config.brokers);
+            tracing::error!("Common issues:");
+            tracing::error!("  1. Broker not accessible at this address");
+            tracing::error!("  2. Network/firewall blocking connection");
+            tracing::error!("  3. SSL/TLS required but not configured (set REDPANDA_SSL_ENABLED=true)");
+            tracing::error!("  4. For Railway: use internal networking (.railway.internal) instead of public URL");
             anyhow!("Failed to create Redpanda producer: {}", e)
         })?;
 
@@ -39,20 +77,27 @@ pub fn create_consumer(config: &RedpandaConfig, group_id: Option<&str>) -> Resul
     tracing::info!("Creating Redpanda consumer");
     tracing::info!("Brokers: {}", config.brokers);
     tracing::info!("Consumer group: {}", group);
+    
+    if config.brokers.contains(".railway.app") {
+        tracing::warn!("Using Railway public URL for brokers. Consider using internal Railway networking (.railway.internal) for better connectivity.");
+    }
 
-    let consumer: StreamConsumer = ClientConfig::new()
-        .set("bootstrap.servers", &config.brokers)
+    let consumer: StreamConsumer = build_client_config(config)
         .set("group.id", group)
         .set("enable.partition.eof", "false")
-        .set("session.timeout.ms", "6000")
+        .set("session.timeout.ms", "30000")
         .set("enable.auto.commit", "true")
         .set("auto.offset.reset", "earliest")
-        .set("metadata.request.timeout.ms", "10000")
-        .set("socket.timeout.ms", "10000")
         .create()
         .map_err(|e| {
             tracing::error!("Failed to create Redpanda consumer: {}", e);
-            tracing::error!("Please verify REDPANDA_BROKERS is set correctly and brokers are accessible");
+            tracing::error!("Broker address: {}", config.brokers);
+            tracing::error!("Consumer group: {}", group);
+            tracing::error!("Common issues:");
+            tracing::error!("  1. Broker not accessible at this address");
+            tracing::error!("  2. Network/firewall blocking connection");
+            tracing::error!("  3. SSL/TLS required but not configured (set REDPANDA_SSL_ENABLED=true)");
+            tracing::error!("  4. For Railway: use internal networking (.railway.internal) instead of public URL");
             anyhow!("Failed to create Redpanda consumer: {}", e)
         })?;
 

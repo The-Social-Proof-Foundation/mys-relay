@@ -17,9 +17,18 @@ restartPolicyMaxRetries = 10
 # - DATABASE_URL (PostgreSQL connection string)
 # - REDIS_URL (Redis connection string)
 # - REDPANDA_BROKERS (Redpanda/Kafka brokers, comma-separated)
+#   * For Railway: Use internal networking (.railway.internal) for better connectivity
+#   * Example: "redpanda-service.up.railway.internal:9092"
+#   * Public URLs (.railway.app) may not work for Kafka protocol connections
 # - REDPANDA_CONSUMER_GROUP (Consumer group name)
 # - JWT_SECRET (Secret key for JWT token generation - MUST be set in production)
 # - ENCRYPTION_KEY (32-byte hex string for message encryption - MUST be set in production)
+#
+# Optional - Redpanda/Kafka SSL/TLS Configuration:
+# - REDPANDA_SSL_ENABLED (Set to "true" or "1" to enable SSL/TLS)
+# - REDPANDA_SSL_CA_LOCATION (Path to CA certificate file)
+# - REDPANDA_SSL_CERT_LOCATION (Path to client certificate file)
+# - REDPANDA_SSL_KEY_LOCATION (Path to client private key file)
 #
 # Server Configuration:
 # - API_PORT (Port for API server, Railway sets PORT automatically)
