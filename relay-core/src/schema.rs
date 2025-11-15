@@ -23,6 +23,7 @@ table! {
         title -> Text,
         body -> Text,
         data -> Nullable<Jsonb>,
+        platform_id -> Nullable<Text>,
         read_at -> Nullable<Timestamptz>,
         created_at -> Timestamptz,
     }

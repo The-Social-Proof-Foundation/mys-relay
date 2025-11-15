@@ -18,10 +18,11 @@ pub async fn run(ctx: RelayContext) -> Result<()> {
     let ctx_clone = ctx.clone();
     
     let app = Router::new()
-        .route("/health", get(handlers::health))
-        .route("/ws", get(websocket::websocket_handler))
-        .route("/api/v1/notifications", get(handlers::get_notifications))
-        .route("/api/v1/notifications/:id/read", post(handlers::mark_notification_read))
+            .route("/health", get(handlers::health))
+            .route("/ws", get(websocket::websocket_handler))
+            .route("/api/v1/notifications", get(handlers::get_notifications))
+            .route("/api/v1/notifications/counts", get(handlers::get_notification_counts))
+            .route("/api/v1/notifications/:id/read", post(handlers::mark_notification_read))
         .route("/api/v1/messages", get(handlers::get_messages))
         .route("/api/v1/messages", post(handlers::send_message))
         .route("/api/v1/conversations", get(handlers::get_conversations))

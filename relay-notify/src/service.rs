@@ -30,12 +30,17 @@ impl NotificationService {
 
             // Create notification
             let notification = self.create_notification(event_type, event_data, &recipient).await?;
+            
+            // Extract platform_id for counting
+            let platform_id = notification
+                .get("platform_id")
+                .and_then(|v| v.as_str());
 
             // Store in Redis inbox
             self.add_to_redis_inbox(&recipient, &notification).await?;
 
-            // Increment unread count
-            self.increment_unread_count(&recipient).await?;
+            // Increment unread count (total and platform-specific)
+            self.increment_unread_count(&recipient, platform_id).await?;
 
             // Emit delivery job to Redpanda
             self.emit_delivery_job(&recipient, &notification).await?;
@@ -84,6 +89,12 @@ impl NotificationService {
         user_address: &str,
     ) -> Result<Value> {
         let (title, body) = self.format_notification(event_type, event_data);
+        
+        // Extract platform_id from event data if available
+        let platform_id = event_data
+            .get("platform_id")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
 
         let notification = serde_json::json!({
             "id": uuid::Uuid::new_v4().to_string(),
@@ -92,6 +103,7 @@ impl NotificationService {
             "title": title,
             "body": body,
             "data": event_data,
+            "platform_id": platform_id,
             "created_at": Utc::now(),
         });
 
@@ -104,6 +116,7 @@ impl NotificationService {
                 relay_notifications::title.eq(&title),
                 relay_notifications::body.eq(&body),
                 relay_notifications::data.eq(event_data),
+                relay_notifications::platform_id.eq(platform_id.as_deref()),
             ))
             .execute(&mut conn)
             .await?;
@@ -157,14 +170,24 @@ impl NotificationService {
         Ok(())
     }
 
-    async fn increment_unread_count(&self, user_address: &str) -> Result<()> {
+    async fn increment_unread_count(&self, user_address: &str, platform_id: Option<&str>) -> Result<()> {
         let mut conn = get_connection(&self.ctx.redis_pool).await?;
-        let key = format!("UNREAD:{}", user_address);
         
+        // Increment total unread count
+        let total_key = format!("UNREAD:{}", user_address);
         redis::cmd("INCR")
-            .arg(&key)
+            .arg(&total_key)
             .query_async(&mut conn)
             .await?;
+        
+        // Increment platform-specific unread count if platform_id is provided
+        if let Some(pid) = platform_id {
+            let platform_key = format!("UNREAD:{}:{}", user_address, pid);
+            redis::cmd("INCR")
+                .arg(&platform_key)
+                .query_async(&mut conn)
+                .await?;
+        }
 
         Ok(())
     }
