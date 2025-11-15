@@ -3,38 +3,35 @@ FROM rust:1.81 as build
 WORKDIR /app
 
 # Copy workspace files
-COPY mys-relay/Cargo.toml mys-relay/Cargo.toml
-COPY mys-relay/relay-core/Cargo.toml mys-relay/relay-core/Cargo.toml
-COPY mys-relay/relay-api/Cargo.toml mys-relay/relay-api/Cargo.toml
-COPY mys-relay/relay-notify/Cargo.toml mys-relay/relay-notify/Cargo.toml
-COPY mys-relay/relay-messaging/Cargo.toml mys-relay/relay-messaging/Cargo.toml
-COPY mys-relay/relay-delivery/Cargo.toml mys-relay/relay-delivery/Cargo.toml
-COPY mys-relay/relay-outbox/Cargo.toml mys-relay/relay-outbox/Cargo.toml
-COPY mys-relay/relay-runner/Cargo.toml mys-relay/relay-runner/Cargo.toml
+COPY Cargo.toml Cargo.toml
+COPY relay-core/Cargo.toml relay-core/Cargo.toml
+COPY relay-api/Cargo.toml relay-api/Cargo.toml
+COPY relay-notify/Cargo.toml relay-notify/Cargo.toml
+COPY relay-messaging/Cargo.toml relay-messaging/Cargo.toml
+COPY relay-delivery/Cargo.toml relay-delivery/Cargo.toml
+COPY relay-outbox/Cargo.toml relay-outbox/Cargo.toml
+COPY relay-runner/Cargo.toml relay-runner/Cargo.toml
 
 # Create dummy source files for dependency caching
-RUN mkdir -p mys-relay/relay-core/src mys-relay/relay-api/src mys-relay/relay-notify/src \
-    mys-relay/relay-messaging/src mys-relay/relay-delivery/src mys-relay/relay-outbox/src \
-    mys-relay/relay-runner/src && \
-    echo "fn main() {}" > mys-relay/relay-runner/src/main.rs && \
-    echo "" > mys-relay/relay-core/src/lib.rs && \
-    echo "" > mys-relay/relay-api/src/lib.rs && \
-    echo "" > mys-relay/relay-notify/src/lib.rs && \
-    echo "" > mys-relay/relay-messaging/src/lib.rs && \
-    echo "" > mys-relay/relay-delivery/src/lib.rs && \
-    echo "" > mys-relay/relay-outbox/src/lib.rs
-
-# Copy workspace Cargo.toml
-COPY Cargo.toml Cargo.toml
+RUN mkdir -p relay-core/src relay-api/src relay-notify/src \
+    relay-messaging/src relay-delivery/src relay-outbox/src \
+    relay-runner/src && \
+    echo "fn main() {}" > relay-runner/src/main.rs && \
+    echo "" > relay-core/src/lib.rs && \
+    echo "" > relay-api/src/lib.rs && \
+    echo "" > relay-notify/src/lib.rs && \
+    echo "" > relay-messaging/src/lib.rs && \
+    echo "" > relay-delivery/src/lib.rs && \
+    echo "" > relay-outbox/src/lib.rs
 
 # Build dependencies only (for caching)
-RUN cd mys-relay && cargo build --release --bin relay-runner || true
+RUN cargo build --release --bin relay-runner || true
 
 # Copy actual source code
-COPY mys-relay/ mys-relay/
+COPY . .
 
 # Build the binary
-RUN cd mys-relay && cargo build --release --bin relay-runner
+RUN cargo build --release --bin relay-runner
 
 FROM debian:bookworm-slim
 
@@ -46,7 +43,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy the binary
-COPY --from=build /app/mys-relay/target/release/relay-runner /usr/local/bin/relay
+COPY --from=build /app/target/release/relay-runner /usr/local/bin/relay
 
 CMD ["relay"]
 
