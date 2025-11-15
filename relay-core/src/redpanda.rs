@@ -18,7 +18,12 @@ fn build_client_config(config: &RedpandaConfig) -> ClientConfig {
         .set("bootstrap.servers", &config.brokers)
         .set("metadata.request.timeout.ms", "30000")
         .set("socket.timeout.ms", "30000")
-        .set("socket.keepalive.enable", "true");
+        .set("socket.keepalive.enable", "true")
+        // Force IPv4 to avoid IPv6 connection issues
+        // Railway internal networking may resolve to IPv6 but service only listens on IPv4
+        .set("broker.address.family", "v4");
+    
+    tracing::info!("Configured to prefer IPv4 connections (broker.address.family=v4)");
     
     // Add SSL/TLS configuration if REDPANDA_SSL_ENABLED is set
     if let Ok(ssl_enabled) = std::env::var("REDPANDA_SSL_ENABLED") {
