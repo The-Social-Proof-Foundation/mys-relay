@@ -1,9 +1,10 @@
-FROM rust:1.81 as build
+FROM rust:1.82 as build
 
 WORKDIR /app
 
 # Copy workspace files
 COPY Cargo.toml Cargo.toml
+COPY Cargo.lock Cargo.lock
 COPY relay-core/Cargo.toml relay-core/Cargo.toml
 COPY relay-api/Cargo.toml relay-api/Cargo.toml
 COPY relay-notify/Cargo.toml relay-notify/Cargo.toml

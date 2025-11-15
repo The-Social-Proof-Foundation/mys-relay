@@ -81,6 +81,9 @@ aes-gcm = "0.10"
 hkdf = "0.12"
 sha2 = "0.10"
 
+# Pin base64ct to avoid edition 2024 requirement
+base64ct = "1.6.0"
+
 # MySocial SDK for signature verification
 mys-sdk = { path = "vendor/mys-sdk", features = ["ed25519", "secp256k1", "secp256r1"] }
 mys-types = { path = "vendor/mys-types" }
@@ -90,3 +93,4 @@ tokio-postgres = { version = "0.7", features = ["with-chrono-0_4", "with-serde_j
 tokio-postgres-rustls = "0.13"
 rustls = { version = "0.23", features = ["std", "tls12", "ring"] }
 rustls-native-certs = "0.8"
+
