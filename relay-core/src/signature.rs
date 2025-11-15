@@ -1,8 +1,8 @@
 use anyhow::{Result, anyhow};
 use mys_sdk::verify_personal_message_signature::verify_personal_message_signature;
 use mys_types::{
-    base_types::MysAddress,
-    signature::GenericSignature,
+    Address,
+    GenericSignature,
 };
 use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -14,12 +14,12 @@ pub async fn verify_mysocial_signature(
     signature: &str,
     expected_address: &str,
 ) -> Result<bool> {
-    // Parse signature string to GenericSignature
-    let generic_sig = GenericSignature::from_str(signature)
-        .map_err(|e| anyhow!("Failed to parse signature: {}", e))?;
+    // Parse signature string to GenericSignature (expects JSON format)
+    let generic_sig: GenericSignature = serde_json::from_str(signature)
+        .map_err(|e| anyhow!("Failed to parse signature as JSON: {}", e))?;
 
-    // Parse wallet address to MysAddress
-    let mys_address = MysAddress::from_str(expected_address)
+    // Parse wallet address to Address
+    let mys_address = Address::from_str(expected_address)
         .map_err(|e| anyhow!("Failed to parse wallet address: {}", e))?;
 
     // Convert message string to bytes

@@ -1,0 +1,10 @@
+target/
+.git/
+.gitignore
+.env
+.env.local
+*.log
+.DS_Store
+.cursor/
+*.md
+!README.md

@@ -8,8 +8,9 @@ use axum::{
 use relay_core::RelayContext;
 use std::net::SocketAddr;
 use tower::ServiceBuilder;
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{CorsLayer, Any};
 use tracing;
+use std::env;
 
 use crate::handlers;
 use crate::websocket;
@@ -18,6 +19,25 @@ use crate::auth;
 pub async fn run(ctx: RelayContext) -> Result<()> {
     let api_port = ctx.config.server.api_port;
     let ctx_clone = ctx.clone();
+    
+    // Configure CORS - allow specific origins or all if CORS_ORIGINS not set
+    let cors_layer = if let Ok(origins) = env::var("CORS_ORIGINS") {
+        // Parse comma-separated origins
+        let origin_list: Vec<&str> = origins.split(',').map(|s| s.trim()).collect();
+        let mut cors = CorsLayer::new();
+        for origin in origin_list {
+            if let Ok(parsed) = origin.parse::<axum::http::HeaderValue>() {
+                cors = cors.allow_origin(parsed);
+            }
+        }
+        cors.allow_methods(Any)
+            .allow_headers(Any)
+            .allow_credentials(true)
+    } else {
+        // Default to permissive for development, but log warning
+        tracing::warn!("CORS_ORIGINS not set, using permissive CORS. Set CORS_ORIGINS for production!");
+        CorsLayer::permissive()
+    };
     
     let app = Router::new()
             .route("/health", get(handlers::health))
@@ -36,7 +56,7 @@ pub async fn run(ctx: RelayContext) -> Result<()> {
                 ServiceBuilder::new()
                     .layer(Extension(ctx_clone))
                     .layer(middleware::from_fn(auth::auth_middleware))
-                    .layer(CorsLayer::permissive()),
+                    .layer(cors_layer),
             );
 
     let addr = SocketAddr::from(([0, 0, 0, 0], api_port));

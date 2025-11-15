@@ -25,6 +25,7 @@ restartPolicyMaxRetries = 10
 # - API_PORT (Port for API server, Railway sets PORT automatically)
 # - WS_PORT (WebSocket port, defaults to 8081)
 # - SERVER_HOST (Host to bind to, defaults to 0.0.0.0)
+# - CORS_ORIGINS (Comma-separated list of allowed CORS origins, e.g., "https://example.com,https://app.example.com" - if not set, allows all origins)
 #
 # Optional - Global Delivery Configuration (fallback if platform-specific config not found):
 # - APNS_BUNDLE_ID (APNs bundle identifier)

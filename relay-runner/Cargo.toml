@@ -16,7 +16,7 @@ relay-notify = { path = "../relay-notify" }
 relay-messaging = { path = "../relay-messaging" }
 relay-delivery = { path = "../relay-delivery" }
 relay-outbox = { path = "../relay-outbox" }
-tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 dotenv = { workspace = true }
