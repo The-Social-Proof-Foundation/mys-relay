@@ -27,6 +27,7 @@ relay-runner (main binary)
 ## Features
 
 ### Notifications
+- ✅ **Platform-specific**: Notifications are tied to specific platforms
 - ✅ Real-time notification processing from blockchain events
 - ✅ Platform-specific notification filtering
 - ✅ Per-user and per-platform unread notification counts
@@ -35,10 +36,11 @@ relay-runner (main binary)
 - ✅ WebSocket support for real-time updates
 
 ### Messaging
-- ✅ Direct messaging between users
+- ✅ **Platform-agnostic**: Direct messaging between users (not platform-specific)
 - ✅ Conversation tracking
 - ✅ Redis Streams for real-time message delivery
 - ✅ Message read receipts
+- ✅ Messages work across all platforms - users can message each other regardless of platform context
 
 ### Delivery
 - ✅ **Platform-specific delivery configuration**: Each platform can configure its own APNs, FCM, and email settings
@@ -65,13 +67,18 @@ When a notification includes a `platform_id`, the relay server:
 ### Core Tables
 
 - `relay_outbox`: CDC table written by indexer, polled by relay
-- `relay_notifications`: User notifications with platform_id support
-- `relay_messages`: Direct messages between users
-- `relay_conversations`: Conversation metadata
+- `relay_notifications`: User notifications with platform_id support (platform-specific)
+- `relay_messages`: Direct messages between users (platform-agnostic)
+- `relay_conversations`: Conversation metadata (platform-agnostic)
 - `relay_user_preferences`: User notification preferences
 - `relay_device_tokens`: Device tokens for push notifications
 - `relay_ws_connections`: Active WebSocket connections
 - `platform_delivery_config`: Platform-specific delivery settings
+
+### Platform-Specific vs Platform-Agnostic
+
+- **Platform-Specific**: Notifications are tied to specific platforms and can be filtered by `platform_id`
+- **Platform-Agnostic**: Messages and conversations work across all platforms - users can message each other regardless of platform context
 
 ## Redis Keys
 
@@ -93,30 +100,39 @@ When a notification includes a `platform_id`, the relay server:
 
 ## API Endpoints
 
+### Authentication
+
+- `POST /api/v1/auth/token`: Generate JWT token for wallet address
+  - Request Body: `{ "wallet_address": "0x...", "signature": "...", "message": "..." }`
+    - `signature`: MySocial signature (GenericSignature format) - **required**
+    - `message`: Must include "Sign in to MySocial Relay", wallet address, nonce, and timestamp - **required**
+  - Response: `{ "token": "jwt_token_here", "expires_in": 2592000 }` (30 days)
+  - **Security**: Uses MySocial SDK to verify signatures. Validates message format, timestamp (max 5 min age), and checks wallet exists in database.
+
 ### Notifications
 
-- `GET /api/v1/notifications?user_address={addr}&platform_id={pid}&limit={n}&offset={n}`: Get notifications (supports platform filtering)
-- `GET /api/v1/notifications/counts?user_address={addr}&platform_id={pid}`: Get unread notification counts (total and per-platform)
+- `GET /api/v1/notifications?platform_id={pid}&limit={n}&offset={n}`: Get notifications (requires JWT auth, supports platform filtering)
+- `GET /api/v1/notifications/counts?platform_id={pid}`: Get unread notification counts (requires JWT auth, total and per-platform)
 - `POST /api/v1/notifications/:id/read`: Mark notification as read
 
-### Messages
+### Messages (Platform-Agnostic)
 
-- `GET /api/v1/messages`: Get messages
-- `POST /api/v1/messages`: Send message
-- `GET /api/v1/conversations`: Get conversations
+- `GET /api/v1/messages?conversation_id={cid}&limit={n}&offset={n}`: Get messages (requires JWT auth, no platform filtering - all user messages)
+- `POST /api/v1/messages`: Send message (requires JWT auth, platform-agnostic)
+- `GET /api/v1/conversations?limit={n}&offset={n}`: Get conversations (requires JWT auth, platform-agnostic)
 
 ### Preferences
 
-- `GET /api/v1/preferences`: Get user preferences
-- `POST /api/v1/preferences`: Update preferences
+- `GET /api/v1/preferences`: Get user preferences (requires JWT auth)
+- `POST /api/v1/preferences`: Update preferences (requires JWT auth)
 
 ### Device Tokens
 
-- `POST /api/v1/device-tokens`: Register device token for push notifications
+- `POST /api/v1/device-tokens`: Register device token for push notifications (requires JWT auth)
 
 ### WebSocket
 
-- `GET /ws?user_address={addr}`: WebSocket connection for real-time updates
+- `GET /ws?token={jwt_token}`: WebSocket connection for real-time updates (requires JWT token in query params)
 
 ### Health
 
@@ -241,15 +257,24 @@ INSERT INTO platform_delivery_config (
 );
 ```
 
-## Notification Flow
+## Notification Flow (Platform-Specific)
 
-1. **Indexer** writes events to `relay_outbox` table
+1. **Indexer** writes events to `relay_outbox` table (includes platform_id when available)
 2. **Outbox Poller** reads unprocessed events and publishes to Redpanda topics
-3. **Notification Service** consumes events, creates notifications, stores in Postgres/Redis
+3. **Notification Service** consumes events, extracts platform_id, creates notifications, stores in Postgres/Redis
 4. **Notification Service** increments unread counts (total and platform-specific)
-5. **Notification Service** emits delivery job to `notifications.delivery` topic
-6. **Delivery Service** consumes delivery jobs, looks up platform config, and sends via APNs/FCM/Email
-7. **API Server** serves notifications via REST API and WebSocket
+5. **Notification Service** emits delivery job to `notifications.delivery` topic (includes platform_id)
+6. **Delivery Service** consumes delivery jobs, looks up platform-specific config, and sends via APNs/FCM/Email
+7. **API Server** serves notifications via REST API and WebSocket (supports platform filtering)
+
+## Messaging Flow (Platform-Agnostic)
+
+1. **Indexer** writes message events to `relay_outbox` table
+2. **Outbox Poller** publishes message events to `events.message.created` topic
+3. **Messaging Service** consumes events, creates messages, stores in Postgres/Redis
+4. **Messaging Service** updates conversation metadata
+5. **Messaging Service** emits WebSocket events via Redis Streams
+6. **API Server** serves messages via REST API and WebSocket (no platform filtering)
 
 ## Development
 

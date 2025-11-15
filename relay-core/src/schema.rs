@@ -35,7 +35,7 @@ table! {
         conversation_id -> Text,
         sender_address -> Text,
         recipient_address -> Text,
-        content -> Text,
+        content -> Bytea, // Encrypted content (base64 encoded string stored as BYTEA)
         content_type -> Text,
         media_urls -> Nullable<Jsonb>,
         metadata -> Nullable<Jsonb>,
@@ -111,6 +111,16 @@ table! {
     }
 }
 
+// Profiles table (from main indexer schema) - for wallet address verification
+table! {
+    profiles (id) {
+        id -> Integer,
+        owner_address -> Varchar,
+        username -> Varchar,
+        created_at -> Timestamp,
+    }
+}
+
 allow_tables_to_appear_in_same_query!(
     relay_outbox,
     relay_notifications,
@@ -120,5 +130,6 @@ allow_tables_to_appear_in_same_query!(
     relay_device_tokens,
     relay_ws_connections,
     platform_delivery_config,
+    profiles,
 );
 

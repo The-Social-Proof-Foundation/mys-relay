@@ -1,6 +1,7 @@
 use axum::{
-    extract::{ws::WebSocketUpgrade, Extension},
-    response::Response,
+    extract::{ws::WebSocketUpgrade, Extension, Query},
+    response::{Response, IntoResponse},
+    http::StatusCode,
 };
 use relay_core::{RelayContext, redis::get_connection};
 use serde::Deserialize;
@@ -11,18 +12,27 @@ use chrono::Utc;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use relay_core::schema::relay_ws_connections;
+use crate::auth::verify_token;
 
 #[derive(Deserialize)]
 pub struct WsQuery {
-    user_address: String,
+    token: String,
 }
 
 pub async fn websocket_handler(
     ws: WebSocketUpgrade,
     Extension(ctx): Extension<RelayContext>,
+    Query(params): Query<WsQuery>,
 ) -> Response {
-    // Extract user_address from query string manually
-    let user_address = "default".to_string(); // TODO: Extract from query string
+    // Verify JWT token and extract user_address
+    let user_address = match verify_token(&params.token, &ctx.config.server.jwt_secret) {
+        Ok(addr) => addr,
+        Err(_) => {
+            tracing::warn!("Invalid JWT token for WebSocket connection");
+            return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
+        }
+    };
+    
     ws.on_upgrade(move |socket| handle_socket(socket, user_address, ctx))
 }
 

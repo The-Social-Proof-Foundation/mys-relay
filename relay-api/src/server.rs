@@ -1,6 +1,7 @@
 use anyhow::Result;
 use axum::{
     extract::Extension,
+    middleware,
     routing::{get, post},
     Router,
 };
@@ -12,6 +13,7 @@ use tracing;
 
 use crate::handlers;
 use crate::websocket;
+use crate::auth;
 
 pub async fn run(ctx: RelayContext) -> Result<()> {
     let api_port = ctx.config.server.api_port;
@@ -20,20 +22,22 @@ pub async fn run(ctx: RelayContext) -> Result<()> {
     let app = Router::new()
             .route("/health", get(handlers::health))
             .route("/ws", get(websocket::websocket_handler))
+            .route("/api/v1/auth/token", post(handlers::generate_token))
             .route("/api/v1/notifications", get(handlers::get_notifications))
             .route("/api/v1/notifications/counts", get(handlers::get_notification_counts))
             .route("/api/v1/notifications/:id/read", post(handlers::mark_notification_read))
-        .route("/api/v1/messages", get(handlers::get_messages))
-        .route("/api/v1/messages", post(handlers::send_message))
-        .route("/api/v1/conversations", get(handlers::get_conversations))
-        .route("/api/v1/preferences", get(handlers::get_preferences))
-        .route("/api/v1/preferences", post(handlers::update_preferences))
-        .route("/api/v1/device-tokens", post(handlers::register_device_token))
-        .layer(
-            ServiceBuilder::new()
-                .layer(Extension(ctx_clone))
-                .layer(CorsLayer::permissive()),
-        );
+            .route("/api/v1/messages", get(handlers::get_messages))
+            .route("/api/v1/messages", post(handlers::send_message))
+            .route("/api/v1/conversations", get(handlers::get_conversations))
+            .route("/api/v1/preferences", get(handlers::get_preferences))
+            .route("/api/v1/preferences", post(handlers::update_preferences))
+            .route("/api/v1/device-tokens", post(handlers::register_device_token))
+            .layer(
+                ServiceBuilder::new()
+                    .layer(Extension(ctx_clone))
+                    .layer(middleware::from_fn(auth::auth_middleware))
+                    .layer(CorsLayer::permissive()),
+            );
 
     let addr = SocketAddr::from(([0, 0, 0, 0], api_port));
     tracing::info!("Starting API server on {}", addr);

@@ -33,6 +33,8 @@ pub struct ServerConfig {
     pub api_port: u16,
     pub ws_port: u16,
     pub host: String,
+    pub jwt_secret: String,
+    pub encryption_key: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -86,6 +88,13 @@ impl Config {
                     .unwrap_or_else(|_| "8081".to_string())
                     .parse()
                     .unwrap_or(8081),
+                jwt_secret: env::var("JWT_SECRET")
+                    .unwrap_or_else(|_| "your-secret-key-change-in-production".to_string()),
+                encryption_key: env::var("ENCRYPTION_KEY")
+                    .unwrap_or_else(|_| {
+                        // Generate a default key for development (32 bytes base64)
+                        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string()
+                    }),
             },
             delivery: DeliveryConfig {
                 apns_bundle_id: env::var("APNS_BUNDLE_ID").ok(),

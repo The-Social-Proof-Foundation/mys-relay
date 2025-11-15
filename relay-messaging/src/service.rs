@@ -3,9 +3,10 @@ use chrono::Utc;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use relay_core::schema::{relay_messages, relay_conversations};
-use relay_core::{RelayContext, redis::get_connection};
+use relay_core::{RelayContext, redis::get_connection, encrypt_message};
 use serde_json::Value;
 use tracing;
+use base64::{engine::general_purpose::STANDARD, Engine};
 
 pub struct MessagingService {
     ctx: RelayContext,
@@ -31,14 +32,25 @@ impl MessagingService {
 
         let conversation_id = self.get_or_create_conversation(sender, recipient).await?;
 
-        // Store message in Postgres
+        // Encrypt message content before storing
+        let encrypted_content = encrypt_message(
+            content,
+            &conversation_id,
+            &self.ctx.config.server.encryption_key,
+        )?;
+        
+        // Convert encrypted string to bytes for BYTEA storage
+        let encrypted_bytes = STANDARD.decode(&encrypted_content)
+            .map_err(|e| anyhow!("Failed to decode encrypted content: {}", e))?;
+
+        // Store encrypted message in Postgres
         let mut conn = self.ctx.db_pool.get().await?;
         diesel::insert_into(relay_messages::table)
             .values((
                 relay_messages::conversation_id.eq(&conversation_id),
                 relay_messages::sender_address.eq(sender),
                 relay_messages::recipient_address.eq(recipient),
-                relay_messages::content.eq(content),
+                relay_messages::content.eq(encrypted_bytes),
                 relay_messages::content_type.eq("text"),
             ))
             .execute(&mut conn)
