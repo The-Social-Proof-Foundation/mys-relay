@@ -20,10 +20,16 @@ pub fn create_producer(config: &RedpandaConfig) -> Result<RedpandaProducer> {
         .set("message.timeout.ms", "5000")
         .set("acks", "all")
         .set("retries", "3")
+        .set("metadata.request.timeout.ms", "10000")
+        .set("socket.timeout.ms", "10000")
         .create()
-        .map_err(|e| anyhow!("Failed to create Redpanda producer: {}", e))?;
+        .map_err(|e| {
+            tracing::error!("Failed to create Redpanda producer: {}", e);
+            tracing::error!("Please verify REDPANDA_BROKERS is set correctly and brokers are accessible");
+            anyhow!("Failed to create Redpanda producer: {}", e)
+        })?;
 
-    tracing::info!("Redpanda producer created successfully");
+    tracing::info!("Redpanda producer created successfully (connection will be established on first use)");
 
     Ok(Arc::new(producer))
 }
@@ -41,10 +47,16 @@ pub fn create_consumer(config: &RedpandaConfig, group_id: Option<&str>) -> Resul
         .set("session.timeout.ms", "6000")
         .set("enable.auto.commit", "true")
         .set("auto.offset.reset", "earliest")
+        .set("metadata.request.timeout.ms", "10000")
+        .set("socket.timeout.ms", "10000")
         .create()
-        .map_err(|e| anyhow!("Failed to create Redpanda consumer: {}", e))?;
+        .map_err(|e| {
+            tracing::error!("Failed to create Redpanda consumer: {}", e);
+            tracing::error!("Please verify REDPANDA_BROKERS is set correctly and brokers are accessible");
+            anyhow!("Failed to create Redpanda consumer: {}", e)
+        })?;
 
-    tracing::info!("Redpanda consumer created successfully");
+    tracing::info!("Redpanda consumer created successfully (connection will be established on first use)");
 
     Ok(Arc::new(consumer))
 }

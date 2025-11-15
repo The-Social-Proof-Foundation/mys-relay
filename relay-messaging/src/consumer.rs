@@ -18,9 +18,13 @@ pub async fn run(ctx: RelayContext) -> Result<()> {
 
     tracing::info!("Subscribed to topic: {}", TOPIC);
 
+    let mut error_count = 0u32;
+    let mut last_error_log = std::time::Instant::now();
+    
     loop {
         match consumer.recv().await {
             Ok(message) => {
+                error_count = 0; // Reset error count on success
                 if let Some(payload) = message.payload() {
                     match handle_message(&service, payload).await {
                         Ok(_) => {
@@ -33,8 +37,19 @@ pub async fn run(ctx: RelayContext) -> Result<()> {
                 }
             }
             Err(e) => {
-                tracing::error!("Error receiving message: {}", e);
-                tokio::time::sleep(Duration::from_secs(1)).await;
+                error_count += 1;
+                // Only log errors every 30 seconds to reduce log spam
+                if last_error_log.elapsed().as_secs() >= 30 {
+                    tracing::warn!(
+                        "Error receiving message from Redpanda (error count: {}): {}",
+                        error_count,
+                        e
+                    );
+                    last_error_log = std::time::Instant::now();
+                }
+                // Exponential backoff: 1s, 2s, 4s, max 30s
+                let backoff = Duration::from_secs(1 << error_count.min(5)).min(Duration::from_secs(30));
+                tokio::time::sleep(backoff).await;
             }
         }
     }
