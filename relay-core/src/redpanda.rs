@@ -11,17 +11,19 @@ use crate::config::RedpandaConfig;
 pub type RedpandaProducer = Arc<FutureProducer>;
 pub type RedpandaConsumer = Arc<StreamConsumer>;
 
-fn build_client_config(config: &RedpandaConfig) -> ClientConfig {
+fn build_client_config(brokers: &str) -> ClientConfig {
     let mut client_config = ClientConfig::new();
     
     client_config
-        .set("bootstrap.servers", &config.brokers)
+        .set("bootstrap.servers", brokers)
         .set("metadata.request.timeout.ms", "30000")
         .set("socket.timeout.ms", "30000")
         .set("socket.keepalive.enable", "true");
     
-    // Railway uses IPv6 for internal networking, so we let rdkafka use the default
-    // address family resolution (which supports both IPv4 and IPv6)
+    // Railway uses IPv6 for internal networking, but Redpanda may only listen on IPv4
+    // Try both IPv4 and IPv6 by not forcing a specific address family
+    // If Redpanda is configured with --kafka-addr internal://0.0.0.0:9092 (IPv4 only),
+    // Railway's IPv6 resolution won't work. Redpanda needs to listen on [::]:9092 for IPv6.
     
     // Add SSL/TLS configuration if REDPANDA_SSL_ENABLED is set
     if let Ok(ssl_enabled) = std::env::var("REDPANDA_SSL_ENABLED") {
@@ -47,26 +49,45 @@ fn build_client_config(config: &RedpandaConfig) -> ClientConfig {
 }
 
 pub fn create_producer(config: &RedpandaConfig) -> Result<RedpandaProducer> {
-    tracing::info!("Creating Redpanda producer");
-    tracing::info!("Brokers: {}", config.brokers);
+    // Ensure port is included
+    let brokers = if config.brokers.contains(':') {
+        config.brokers.clone()
+    } else {
+        format!("{}:9092", config.brokers)
+    };
     
-    if config.brokers.contains(".railway.app") {
+    tracing::info!("Creating Redpanda producer");
+    tracing::info!("Brokers: {}", brokers);
+    
+    if brokers.contains(".railway.app") {
         tracing::warn!("Using Railway public URL for brokers. Consider using internal Railway networking (.railway.internal) for better connectivity.");
     }
+    
+    if brokers.contains(".railway.internal") && !brokers.contains(':') {
+        tracing::warn!("Railway internal address without port - adding :9092");
+    }
 
-    let producer: FutureProducer = build_client_config(config)
+    let producer: FutureProducer = build_client_config(&brokers)
         .set("message.timeout.ms", "5000")
         .set("acks", "all")
         .set("retries", "3")
         .create()
         .map_err(|e| {
             tracing::error!("Failed to create Redpanda producer: {}", e);
-            tracing::error!("Broker address: {}", config.brokers);
+            tracing::error!("Broker address: {}", brokers);
+            if brokers.contains(".railway.internal") {
+                tracing::error!("Railway IPv6/IPv4 mismatch detected!");
+                tracing::error!("Railway resolves .railway.internal to IPv6, but Redpanda may only listen on IPv4.");
+                tracing::error!("Fix: Update Redpanda REDPANDA_OPTS to listen on IPv6:");
+                tracing::error!("  Change: --kafka-addr internal://0.0.0.0:9092");
+                tracing::error!("  To:     --kafka-addr internal://[::]:9092");
+                tracing::error!("Or use:  --kafka-addr internal://0.0.0.0:9092,internal://[::]:9092");
+            }
             tracing::error!("Common issues:");
             tracing::error!("  1. Broker not accessible at this address");
             tracing::error!("  2. Network/firewall blocking connection");
             tracing::error!("  3. SSL/TLS required but not configured (set REDPANDA_SSL_ENABLED=true)");
-            tracing::error!("  4. For Railway: use internal networking (.railway.internal) instead of public URL");
+            tracing::error!("  4. IPv4/IPv6 mismatch (Railway uses IPv6, Redpanda must listen on IPv6)");
             anyhow!("Failed to create Redpanda producer: {}", e)
         })?;
 
@@ -77,15 +98,27 @@ pub fn create_producer(config: &RedpandaConfig) -> Result<RedpandaProducer> {
 
 pub fn create_consumer(config: &RedpandaConfig, group_id: Option<&str>) -> Result<RedpandaConsumer> {
     let group = group_id.unwrap_or(&config.consumer_group);
+    
+    // Ensure port is included
+    let brokers = if config.brokers.contains(':') {
+        config.brokers.clone()
+    } else {
+        format!("{}:9092", config.brokers)
+    };
+    
     tracing::info!("Creating Redpanda consumer");
-    tracing::info!("Brokers: {}", config.brokers);
+    tracing::info!("Brokers: {}", brokers);
     tracing::info!("Consumer group: {}", group);
     
-    if config.brokers.contains(".railway.app") {
+    if brokers.contains(".railway.app") {
         tracing::warn!("Using Railway public URL for brokers. Consider using internal Railway networking (.railway.internal) for better connectivity.");
     }
+    
+    if brokers.contains(".railway.internal") && !brokers.contains(':') {
+        tracing::warn!("Railway internal address without port - adding :9092");
+    }
 
-    let consumer: StreamConsumer = build_client_config(config)
+    let consumer: StreamConsumer = build_client_config(&brokers)
         .set("group.id", group)
         .set("enable.partition.eof", "false")
         .set("session.timeout.ms", "30000")
@@ -94,13 +127,21 @@ pub fn create_consumer(config: &RedpandaConfig, group_id: Option<&str>) -> Resul
         .create()
         .map_err(|e| {
             tracing::error!("Failed to create Redpanda consumer: {}", e);
-            tracing::error!("Broker address: {}", config.brokers);
+            tracing::error!("Broker address: {}", brokers);
             tracing::error!("Consumer group: {}", group);
+            if brokers.contains(".railway.internal") {
+                tracing::error!("Railway IPv6/IPv4 mismatch detected!");
+                tracing::error!("Railway resolves .railway.internal to IPv6, but Redpanda may only listen on IPv4.");
+                tracing::error!("Fix: Update Redpanda REDPANDA_OPTS to listen on IPv6:");
+                tracing::error!("  Change: --kafka-addr internal://0.0.0.0:9092");
+                tracing::error!("  To:     --kafka-addr internal://[::]:9092");
+                tracing::error!("Or use:  --kafka-addr internal://0.0.0.0:9092,internal://[::]:9092");
+            }
             tracing::error!("Common issues:");
             tracing::error!("  1. Broker not accessible at this address");
             tracing::error!("  2. Network/firewall blocking connection");
             tracing::error!("  3. SSL/TLS required but not configured (set REDPANDA_SSL_ENABLED=true)");
-            tracing::error!("  4. For Railway: use internal networking (.railway.internal) instead of public URL");
+            tracing::error!("  4. IPv4/IPv6 mismatch (Railway uses IPv6, Redpanda must listen on IPv6)");
             anyhow!("Failed to create Redpanda consumer: {}", e)
         })?;
 
