@@ -1,0 +1,24 @@
+[package]
+name = "relay-runner"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "relay-runner"
+path = "src/main.rs"
+
+[dependencies]
+relay-core = { path = "../relay-core" }
+relay-api = { path = "../relay-api" }
+relay-notify = { path = "../relay-notify" }
+relay-messaging = { path = "../relay-messaging" }
+relay-delivery = { path = "../relay-delivery" }
+relay-outbox = { path = "../relay-outbox" }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+dotenv = { workspace = true }
+anyhow = { workspace = true }
+

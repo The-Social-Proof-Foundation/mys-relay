@@ -1,0 +1,76 @@
+[workspace]
+resolver = "2"
+members = [
+    "relay-core",
+    "relay-api",
+    "relay-notify",
+    "relay-messaging",
+    "relay-delivery",
+    "relay-outbox",
+    "relay-runner",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["The Social Proof Foundation"]
+license = "Apache-2.0"
+
+[workspace.dependencies]
+# Async runtime
+tokio = "1.43.0"
+async-trait = "0.1.61"
+futures = "0.3.28"
+futures-util = "0.3.28"
+
+# Database
+diesel = { version = "2.2", features = ["postgres", "chrono", "serde_json", "r2d2"] }
+diesel-async = { version = "0.6", features = ["postgres", "deadpool", "async-connection-wrapper"] }
+diesel_migrations = "2.2"
+
+# Redis
+redis = { version = "0.26", features = ["tokio-comp", "connection-manager", "streams"] }
+
+# Kafka/Redpanda
+rdkafka = { version = "0.36", features = ["cmake-build", "ssl-vendored"] }
+
+# HTTP/WebSocket
+axum = { version = "0.7", default-features = false, features = ["macros", "tokio", "http1", "http2", "json", "ws"] }
+tower = { version = "0.4.12", features = ["full"] }
+tower-http = { version = "0.5", features = ["trace", "cors"] }
+hyper = { version = "1", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0.144", features = ["derive"] }
+serde_json = "1.0.95"
+
+# Error handling
+anyhow = "1.0.71"
+thiserror = "1.0.40"
+
+# Logging
+tracing = "0.1.37"
+tracing-subscriber = { version = "0.3.15", default-features = false, features = ["std", "fmt", "ansi", "env-filter", "json"] }
+
+# Utilities
+chrono = { version = "0.4.38", features = ["clock", "serde"] }
+uuid = { version = "1.1.2", features = ["v4", "serde"] }
+dotenv = "0.15.0"
+
+# APNs
+a2 = "0.5"
+
+# FCM
+fcm = "0.9"
+
+# HTTP Client
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# Base64 encoding
+base64 = "0.22"
+
+# TLS
+tokio-postgres = { version = "0.7", features = ["with-chrono-0_4", "with-serde_json-1"] }
+tokio-postgres-rustls = "0.13"
+rustls = { version = "0.23", features = ["std", "tls12", "ring"] }
+rustls-native-certs = "0.8"

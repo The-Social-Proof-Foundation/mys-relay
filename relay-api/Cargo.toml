@@ -1,0 +1,24 @@
+[package]
+name = "relay-api"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+relay-core = { path = "../relay-core" }
+tokio = { workspace = true }
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+futures-util = "0.3"
+redis = { workspace = true }
+diesel = { workspace = true, features = ["postgres", "chrono", "serde_json"] }
+diesel-async = { workspace = true, features = ["postgres", "deadpool", "async-connection-wrapper"] }
+
