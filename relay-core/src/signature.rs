@@ -1,5 +1,5 @@
 use anyhow::{Result, anyhow};
-use mys_sdk::verify_personal_message_signature;
+use mys_sdk::verify_personal_message_signature::verify_personal_message_signature;
 use mys_types::{
     base_types::MysAddress,
     signature::GenericSignature,

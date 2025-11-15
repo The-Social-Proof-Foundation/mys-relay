@@ -97,14 +97,34 @@ async fn publish_event(
     event_id: Option<&str>,
     transaction_id: Option<&str>,
 ) -> Result<()> {
-    // Determine topic from event type
+    // Determine topic from event type using category-based routing
     let topic = match event_type {
-        t if t.starts_with("like.") => "events.like.created",
+        // Post-related events
+        t if t.starts_with("reaction.") => "events.post.reaction",
+        t if t.starts_with("repost.") => "events.post.repost",
+        t if t.starts_with("tip.") => "events.post.tip",
+        t if t.starts_with("post.created") => "events.post.created",
+        t if t.starts_with("ownership.transferred") => "events.post.ownership",
+        // Comment events (keep separate)
         t if t.starts_with("comment.") => "events.comment.created",
-        t if t.starts_with("message.") => "events.message.created",
+        // Social proof token events
+        t if t.starts_with("spt.") => "events.spt.created",
+        // Governance events
+        t if t.starts_with("governance.") => "events.governance.created",
+        // Prediction events
+        t if t.starts_with("prediction.") => "events.prediction.created",
+        // Social graph events
         t if t.starts_with("follow.") => "events.follow.created",
         t if t.starts_with("unfollow.") => "events.unfollow.created",
-        _ => "events.unknown",
+        // Messaging (handled separately by messaging service)
+        t if t.starts_with("message.") => "events.message.created",
+        // Platform events
+        t if t.starts_with("platform.") => "events.platform.created",
+        // Fallback for unknown events
+        _ => {
+            tracing::warn!("Unknown event type: {}, routing to events.unknown", event_type);
+            "events.unknown"
+        },
     };
 
     // Create message payload

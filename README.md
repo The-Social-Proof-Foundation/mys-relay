@@ -90,53 +90,80 @@ When a notification includes a `platform_id`, the relay server:
 
 ## Redpanda Topics
 
-- `events.like.created`: Like events
-- `events.comment.created`: Comment events
-- `events.message.created`: Message events
-- `notifications.delivery`: Delivery jobs
-- `delivery.apns`: APNs delivery queue
-- `delivery.fcm`: FCM delivery queue
-- `delivery.email`: Email delivery queue
+The relay server uses a category-based topic structure for organizing notification events:
+
+### Notification Event Topics
+
+- **Post-related events:**
+  - `events.post.reaction`: `reaction.created`
+  - `events.post.repost`: `repost.created`
+  - `events.post.tip`: `tip.created`
+  - `events.post.created`: `post.created`
+  - `events.post.ownership`: `ownership.transferred`
+
+- **Comment events:**
+  - `events.comment.created`: `comment.created`
+
+- **Social proof token events:**
+  - `events.spt.created`: `spt.token_bought`, `spt.token_sold`, `spt.tokens_added`, `spt.reservation_created`
+
+- **Governance events:**
+  - `events.governance.created`: `governance.proposal_submitted`, `governance.proposal_approved`, `governance.proposal_rejected`, `governance.proposal_rejected_by_community`, `governance.proposal_implemented`
+
+- **Prediction events:**
+  - `events.prediction.created`: `prediction.bet_placed`, `prediction.resolved`, `prediction.payout`
+
+- **Social graph events:**
+  - `events.follow.created`: `follow.created`
+  - `events.unfollow.created`: `unfollow.created`
+
+- **Platform events:**
+  - `events.platform.created`: `platform.moderator_added`, `platform.moderator_removed`, `platform.user_joined`, `platform.user_left`
+
+- **Messaging events:**
+  - `events.message.created`: `message.created` (handled by messaging service, not notification service)
+
+### Delivery Topics
+
+- `notifications.delivery`: Delivery jobs (consumed by delivery workers)
+- `delivery.apns`: APNs delivery queue (legacy, not currently used)
+- `delivery.fcm`: FCM delivery queue (legacy, not currently used)
+- `delivery.email`: Email delivery queue (legacy, not currently used)
+
+### Topic Routing
+
+Events are routed to topics based on their `event_type` prefix:
+- `reaction.*` → `events.post.reaction`
+- `repost.*` → `events.post.repost`
+- `tip.*` → `events.post.tip`
+- `post.created` → `events.post.created`
+- `ownership.transferred` → `events.post.ownership`
+- `comment.*` → `events.comment.created`
+- `spt.*` → `events.spt.created`
+- `governance.*` → `events.governance.created`
+- `prediction.*` → `events.prediction.created`
+- `follow.*` → `events.follow.created`
+- `unfollow.*` → `events.unfollow.created`
+- `platform.*` → `events.platform.created`
+- `message.*` → `events.message.created`
+- Unknown events → `events.unknown` (with warning)
 
 ## API Endpoints
 
-### Authentication
+All authenticated endpoints require a valid JWT token in the `Authorization` header as `Bearer {token}`.
 
-- `POST /api/v1/auth/token`: Generate JWT token for wallet address
-  - Request Body: `{ "wallet_address": "0x...", "signature": "...", "message": "..." }`
-    - `signature`: MySocial signature (GenericSignature format) - **required**
-    - `message`: Must include "Sign in to MySocial Relay", wallet address, nonce, and timestamp - **required**
-  - Response: `{ "token": "jwt_token_here", "expires_in": 2592000 }` (30 days)
-  - **Security**: Uses MySocial SDK to verify signatures. Validates message format, timestamp (max 5 min age), and checks wallet exists in database.
-
-### Notifications
-
+- `POST /api/v1/auth/token`: Generate JWT token (requires MySocial signature verification, no auth required)
 - `GET /api/v1/notifications?platform_id={pid}&limit={n}&offset={n}`: Get notifications (requires JWT auth, supports platform filtering)
 - `GET /api/v1/notifications/counts?platform_id={pid}`: Get unread notification counts (requires JWT auth, total and per-platform)
-- `POST /api/v1/notifications/:id/read`: Mark notification as read
-
-### Messages (Platform-Agnostic)
-
-- `GET /api/v1/messages?conversation_id={cid}&limit={n}&offset={n}`: Get messages (requires JWT auth, no platform filtering - all user messages)
-- `POST /api/v1/messages`: Send message (requires JWT auth, platform-agnostic)
+- `POST /api/v1/notifications/:id/read`: Mark notification as read (requires JWT auth)
+- `GET /api/v1/messages?conversation_id={cid}&limit={n}&offset={n}`: Get messages (requires JWT auth, messages are automatically decrypted)
+- `POST /api/v1/messages`: Send message (requires JWT auth, message content is automatically encrypted)
 - `GET /api/v1/conversations?limit={n}&offset={n}`: Get conversations (requires JWT auth, platform-agnostic)
-
-### Preferences
-
-- `GET /api/v1/preferences`: Get user preferences (requires JWT auth)
-- `POST /api/v1/preferences`: Update preferences (requires JWT auth)
-
-### Device Tokens
-
-- `POST /api/v1/device-tokens`: Register device token for push notifications (requires JWT auth)
-
-### WebSocket
-
-- `GET /ws?token={jwt_token}`: WebSocket connection for real-time updates (requires JWT token in query params)
-
-### Health
-
-- `GET /health`: Health check endpoint
+- `GET /api/v1/preferences`: Get user notification preferences (requires JWT auth)
+- `POST /api/v1/preferences`: Update user notification preferences (requires JWT auth)
+- `POST /api/v1/device-tokens`: Register/update device token for push notifications (requires JWT auth)
+- `GET /ws?token={jwt_token}`: WebSocket connection for real-time updates (requires JWT token in query param)
+- `GET /health`: Health check endpoint (no authentication required)
 
 ## Configuration
 
@@ -158,6 +185,8 @@ When a notification includes a `platform_id`, the relay server:
 - `API_PORT` or `PORT`: API server port (default: 8080)
 - `WS_PORT`: WebSocket port (default: 8081)
 - `SERVER_HOST`: Server host (default: 0.0.0.0)
+- `JWT_SECRET`: Secret key for JWT token signing (required in production)
+- `ENCRYPTION_KEY`: Master encryption key for message encryption (64 hex characters, required in production)
 
 #### Global Delivery Config (Fallback)
 - `APNS_BUNDLE_ID`: iOS bundle ID
@@ -271,10 +300,17 @@ INSERT INTO platform_delivery_config (
 
 1. **Indexer** writes message events to `relay_outbox` table
 2. **Outbox Poller** publishes message events to `events.message.created` topic
-3. **Messaging Service** consumes events, creates messages, stores in Postgres/Redis
+3. **Messaging Service** consumes events, encrypts message content, stores in Postgres/Redis
 4. **Messaging Service** updates conversation metadata
 5. **Messaging Service** emits WebSocket events via Redis Streams
 6. **API Server** serves messages via REST API and WebSocket (no platform filtering)
+7. **API Server** automatically decrypts messages before returning to clients
+
+**Message Encryption:**
+- Messages are encrypted using AES-256-GCM before storage
+- Each conversation uses a unique encryption key derived from the master key
+- Encryption keys are derived using HKDF with the conversation ID as the salt
+- Only the message content is encrypted; metadata (sender, recipient, timestamps) remains unencrypted
 
 ## Development
 
@@ -305,6 +341,30 @@ cargo test --workspace
 ```bash
 cargo clippy --workspace
 ```
+
+## Security Considerations
+
+### Authentication
+- **JWT Tokens**: Tokens expire after 30 days. Clients should refresh tokens before expiration.
+- **Signature Verification**: All token generation requests require valid MySocial signatures.
+- **Replay Protection**: Message timestamps prevent replay attacks (5-minute window).
+- **Database Validation**: Wallet addresses must exist in the profiles table.
+
+### Message Encryption
+- **At-Rest Encryption**: All messages are encrypted before storage in PostgreSQL.
+- **Key Derivation**: Per-conversation keys prevent key compromise from affecting other conversations.
+- **Key Management**: The master encryption key (`ENCRYPTION_KEY`) must be kept secure and rotated periodically.
+
+### Production Checklist
+- [ ] Set strong `JWT_SECRET` (use cryptographically secure random string)
+- [ ] Set strong `ENCRYPTION_KEY` (64 hex characters, generate with: `openssl rand -hex 32`)
+- [ ] Use HTTPS/TLS for all API connections
+- [ ] Configure proper CORS policies
+- [ ] Set up monitoring and alerting
+- [ ] Rotate encryption keys periodically
+- [ ] Implement rate limiting for authentication endpoints
+- [ ] Use secure database credentials
+- [ ] Enable Redis authentication if exposed
 
 ## License
 

@@ -7,11 +7,26 @@ use std::time::Duration;
 use tracing;
 
 const TOPICS: &[&str] = &[
-    "events.like.created",
+    // Post-related events
+    "events.post.reaction",
+    "events.post.repost",
+    "events.post.tip",
+    "events.post.created",
+    "events.post.ownership",
+    // Comment events
     "events.comment.created",
+    // Social proof token events
+    "events.spt.created",
+    // Governance events
+    "events.governance.created",
+    // Prediction events
+    "events.prediction.created",
+    // Social graph events
     "events.follow.created",
     "events.unfollow.created",
-    "events.message.created",
+    // Platform events
+    "events.platform.created",
+    // Note: events.message.created is handled by relay-messaging service, not here
 ];
 
 pub async fn run(ctx: RelayContext) -> Result<()> {

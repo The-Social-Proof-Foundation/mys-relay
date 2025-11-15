@@ -12,12 +12,47 @@ restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 
 # Environment variables that should be set in Railway dashboard:
+#
+# Required:
 # - DATABASE_URL (PostgreSQL connection string)
 # - REDIS_URL (Redis connection string)
-# - REDPANDA_BROKERS (Redpanda/Kafka brokers)
+# - REDPANDA_BROKERS (Redpanda/Kafka brokers, comma-separated)
 # - REDPANDA_CONSUMER_GROUP (Consumer group name)
+# - JWT_SECRET (Secret key for JWT token generation - MUST be set in production)
+# - ENCRYPTION_KEY (32-byte hex string for message encryption - MUST be set in production)
+#
+# Server Configuration:
 # - API_PORT (Port for API server, Railway sets PORT automatically)
-# - APNS_BUNDLE_ID, APNS_KEY_ID, APNS_TEAM_ID, APNS_KEY_PATH (for APNs)
-# - FCM_SERVER_KEY (for FCM)
-# - RESEND_API_KEY, RESEND_FROM_EMAIL (for email delivery)
+# - WS_PORT (WebSocket port, defaults to 8081)
+# - SERVER_HOST (Host to bind to, defaults to 0.0.0.0)
+#
+# Optional - Global Delivery Configuration (fallback if platform-specific config not found):
+# - APNS_BUNDLE_ID (APNs bundle identifier)
+# - APNS_KEY_ID (APNs key ID)
+# - APNS_TEAM_ID (APNs team ID)
+# - APNS_KEY_PATH (Path to APNs key file)
+# - APNS_KEY_CONTENT (Base64-encoded APNs key content - alternative to APNS_KEY_PATH)
+# - FCM_SERVER_KEY (FCM server key)
+# - RESEND_API_KEY (Resend API key)
+# - RESEND_FROM_EMAIL (Default from email address for Resend)
+#
+# Connection Pool Configuration (optional, defaults shown):
+# - DATABASE_MAX_CONNECTIONS (default: 10)
+# - REDIS_MAX_CONNECTIONS (default: 10)
+#
+# Note: Platform-specific delivery configurations (APNs, FCM, Resend) are stored in the
+# platform_delivery_config table in the database. Global env vars above are used as fallback
+# when platform-specific configs are not available.
+#
+# Redpanda Topics (automatically created):
+# The relay server uses category-based topics:
+# - events.post.reaction, events.post.repost, events.post.tip, events.post.created, events.post.ownership
+# - events.comment.created
+# - events.spt.created
+# - events.governance.created
+# - events.prediction.created
+# - events.follow.created, events.unfollow.created
+# - events.platform.created
+# - events.message.created
+# - notifications.delivery
 
