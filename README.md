@@ -1,6 +1,20 @@
 # MySocial Relay Server
 
-A production-ready notification and messaging relay server for the MySocial platform. The relay server handles real-time notifications, messaging, push notifications (APNs/FCM), email delivery, and WebSocket connections.
+# ⚠️ DEPRECATED
+
+> **This repository is no longer maintained and has been deprecated.**
+>
+> Development has moved to the **MySocial Messaging Stack**:
+>
+> **https://github.com/The-Social-Proof-Foundation/myso-messaging-stack**
+>
+> This repository remains available for historical reference only and should not be used for new development.
+>
+> All notification, messaging, relay, delivery, and real-time communication functionality has been migrated to the Messaging Stack.
+
+---
+
+A notification and messaging relay server for the MySocial platform. The relay server handles real-time notifications, messaging, push notifications (APNs/FCM), email delivery, and WebSocket connections.
 
 ## Architecture
 
